@@ -1,3 +1,4 @@
+pub mod doctor;
 pub mod off;
 pub mod on;
 pub mod status;
