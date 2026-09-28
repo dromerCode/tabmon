@@ -1,3 +1,4 @@
+pub mod adb;
 pub mod config;
 pub mod error;
 pub mod state;
