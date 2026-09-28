@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 
+use crate::config::Paths;
 use crate::error::UserError;
 use crate::system::{Output, System};
 
@@ -27,6 +28,16 @@ pub fn fail(stderr: &str) -> Output {
         stdout: String::new(),
         stderr: stderr.to_string(),
     }
+}
+
+/// Paths inside a fresh temporary directory; keep the `TempDir` alive for the test.
+pub fn temp_paths() -> (tempfile::TempDir, Paths) {
+    let dir = tempfile::tempdir().unwrap();
+    let paths = Paths {
+        config_file: dir.path().join("config.toml"),
+        runtime_dir: dir.path().join("tabmon"),
+    };
+    (dir, paths)
 }
 
 /// Records every call and answers with scripted responses.
