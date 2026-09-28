@@ -1,4 +1,7 @@
+pub mod off;
 pub mod on;
+pub mod status;
+pub mod toggle;
 
 use anyhow::Result;
 
