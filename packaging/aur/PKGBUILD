@@ -1,0 +1,40 @@
+# Maintainer: pichaDev <daniplay1011@gmail.com>
+pkgname=tabmon
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Use an Android tablet as an extended monitor on niri (vkms + wayvnc + adb)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/pichaDev/tabmon"
+license=('MIT')
+depends=('niri' 'wayvnc' 'android-tools' 'gcc-libs' 'glibc')
+optdepends=('libnotify: desktop notifications')
+makedepends=('cargo')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc --print host-tuple)"
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo test --frozen
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  install -Dm755 target/release/tabmon "$pkgdir/usr/bin/tabmon"
+  install -Dm644 packaging/modules-load.d/tabmon-vkms.conf "$pkgdir/usr/lib/modules-load.d/tabmon-vkms.conf"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

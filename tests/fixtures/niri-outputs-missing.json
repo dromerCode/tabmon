@@ -1,0 +1,92 @@
+{
+  "eDP-1": {
+    "name": "eDP-1",
+    "make": "AU Optronics",
+    "model": "0xF7AD",
+    "serial": null,
+    "physical_size": [
+      340,
+      190
+    ],
+    "modes": [
+      {
+        "width": 1920,
+        "height": 1080,
+        "refresh_rate": 144000,
+        "is_preferred": true
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "refresh_rate": 144000,
+        "is_preferred": true
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "refresh_rate": 60001,
+        "is_preferred": false
+      },
+      {
+        "width": 1680,
+        "height": 1050,
+        "refresh_rate": 144000,
+        "is_preferred": false
+      },
+      {
+        "width": 1280,
+        "height": 1024,
+        "refresh_rate": 144000,
+        "is_preferred": false
+      },
+      {
+        "width": 1440,
+        "height": 900,
+        "refresh_rate": 144000,
+        "is_preferred": false
+      },
+      {
+        "width": 1280,
+        "height": 800,
+        "refresh_rate": 144000,
+        "is_preferred": false
+      },
+      {
+        "width": 1280,
+        "height": 720,
+        "refresh_rate": 144000,
+        "is_preferred": false
+      },
+      {
+        "width": 1024,
+        "height": 768,
+        "refresh_rate": 144000,
+        "is_preferred": false
+      },
+      {
+        "width": 800,
+        "height": 600,
+        "refresh_rate": 144000,
+        "is_preferred": false
+      },
+      {
+        "width": 640,
+        "height": 480,
+        "refresh_rate": 144000,
+        "is_preferred": false
+      }
+    ],
+    "current_mode": 1,
+    "is_custom_mode": false,
+    "vrr_supported": true,
+    "vrr_enabled": true,
+    "logical": {
+      "x": -1237,
+      "y": 0,
+      "width": 1920,
+      "height": 1080,
+      "scale": 1.0,
+      "transform": "Normal"
+    }
+  }
+}
