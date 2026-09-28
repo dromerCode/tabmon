@@ -29,6 +29,7 @@ mod tests {
                 port: 5900,
                 serial: "ABC123".into(),
                 output: "Virtual-1".into(),
+                created_reverse: true,
             },
         )
         .unwrap();

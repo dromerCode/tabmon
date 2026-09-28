@@ -90,6 +90,26 @@ pub fn reverse(sys: &dyn System, serial: &str, port: u16) -> Result<()> {
     Ok(())
 }
 
+/// Whether the device already forwards `tcp:<port>` back to this machine.
+pub fn has_reverse(sys: &dyn System, serial: &str, port: u16) -> Result<bool> {
+    let out = sys.run("adb", &["-s", serial, "reverse", "--list"])?;
+    if !out.success {
+        return Err(
+            UserError::new(format!("adb reverse --list failed: {}", out.stderr.trim()))
+                .hint("reconnect the tablet and try again")
+                .into(),
+        );
+    }
+    Ok(parse_reverse_list(&out.stdout, port))
+}
+
+/// Parses `adb reverse --list` lines (`<transport> tcp:<remote> tcp:<local>`).
+pub fn parse_reverse_list(text: &str, port: u16) -> bool {
+    let remote = format!("tcp:{port}");
+    text.lines()
+        .any(|line| line.split_whitespace().nth(1) == Some(remote.as_str()))
+}
+
 pub fn remove_reverse(sys: &dyn System, serial: &str, port: u16) -> Result<()> {
     let tcp = format!("tcp:{port}");
     let out = sys.run("adb", &["-s", serial, "reverse", "--remove", &tcp])?;
@@ -230,6 +250,26 @@ mod tests {
                 "adb -s ABC123 reverse --remove tcp:5900"
             ]
         );
+    }
+
+    #[test]
+    fn reverse_list_finds_the_port() {
+        let text = "UsbFfs tcp:5900 tcp:5900\nUsbFfs tcp:8081 tcp:8081\n\n";
+        assert!(parse_reverse_list(text, 5900));
+        assert!(parse_reverse_list(text, 8081));
+        assert!(!parse_reverse_list(text, 5901));
+        assert!(!parse_reverse_list("", 5900));
+    }
+
+    #[test]
+    fn has_reverse_asks_the_device() {
+        let fake = FakeSystem::new();
+        fake.respond(
+            "adb -s ABC123 reverse --list",
+            ok("UsbFfs tcp:5900 tcp:5900\n"),
+        );
+        assert!(has_reverse(&fake, "ABC123", 5900).unwrap());
+        assert!(!has_reverse(&fake, "ABC123", 5901).unwrap());
     }
 
     #[test]

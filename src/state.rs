@@ -12,6 +12,8 @@ pub struct State {
     pub port: u16,
     pub serial: String,
     pub output: String,
+    /// False when the `adb reverse` already existed before `on`, so `off` must leave it.
+    pub created_reverse: bool,
 }
 
 /// Saved state, or `None` if there is none or it cannot be understood.
@@ -53,6 +55,7 @@ mod tests {
             port: 5900,
             serial: "ABC123".into(),
             output: "Virtual-1".into(),
+            created_reverse: true,
         }
     }
 

@@ -14,6 +14,8 @@ pub fn run(ctx: &Ctx) -> Result<String> {
     let live = vnc::is_running(ctx.sys, saved.pid);
     if live {
         vnc::stop(ctx.sys, saved.pid)?;
+    }
+    if saved.created_reverse {
         // The reverse disappears by itself when the tablet is unplugged, so failing here is fine.
         let _ = adb::remove_reverse(ctx.sys, &saved.serial, saved.port);
     }
@@ -58,6 +60,7 @@ mod tests {
             port: 5900,
             serial: "ABC123".into(),
             output: "Virtual-1".into(),
+            created_reverse: true,
         }
     }
 
@@ -144,6 +147,45 @@ mod tests {
         assert!(
             fake.calls()
                 .contains(&"niri msg output Virtual-1 off".to_string())
+        );
+    }
+
+    #[test]
+    fn reverse_not_created_by_tabmon_is_left_alone() {
+        let (_dir, paths) = temp_paths();
+        let fake = FakeSystem::new();
+        state::save(
+            &paths,
+            &State {
+                created_reverse: false,
+                ..saved()
+            },
+        )
+        .unwrap();
+        fake.add_process(77, "wayvnc");
+        fake.respond("niri msg --json outputs", ok(ON));
+        let niri = Niri::new(&fake);
+
+        run(&ctx(&fake, &niri, &paths)).unwrap();
+        let calls = fake.calls();
+        assert!(
+            !calls.iter().any(|c| c.contains("reverse --remove")),
+            "{calls:?}"
+        );
+    }
+
+    #[test]
+    fn stale_session_removes_its_own_reverse() {
+        let (_dir, paths) = temp_paths();
+        let fake = FakeSystem::new();
+        state::save(&paths, &saved()).unwrap();
+        fake.respond("niri msg --json outputs", ok(OFF));
+        let niri = Niri::new(&fake);
+
+        run(&ctx(&fake, &niri, &paths)).unwrap();
+        assert!(
+            fake.calls()
+                .contains(&"adb -s ABC123 reverse --remove tcp:5900".to_string())
         );
     }
 

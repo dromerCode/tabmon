@@ -58,8 +58,12 @@ fn bring_up(ctx: &Ctx, before: OutputState, serial: &str, done: &mut Vec<Undo>) 
         done.push(Undo::OutputOff);
         wait_until_on(ctx)?;
     }
+    // A reverse that was already there belongs to someone else: never undo it.
+    let created_reverse = !adb::has_reverse(ctx.sys, serial, cfg.port)?;
     adb::reverse(ctx.sys, serial, cfg.port)?;
-    done.push(Undo::RemoveReverse);
+    if created_reverse {
+        done.push(Undo::RemoveReverse);
+    }
 
     std::fs::create_dir_all(&ctx.paths.runtime_dir)
         .with_context(|| format!("could not create {}", ctx.paths.runtime_dir.display()))?;
@@ -77,6 +81,7 @@ fn bring_up(ctx: &Ctx, before: OutputState, serial: &str, done: &mut Vec<Undo>) 
         port: cfg.port,
         serial: serial.to_string(),
         output: cfg.output.clone(),
+        created_reverse,
     };
     state::save(&ctx.paths, &saved)
 }
@@ -122,6 +127,7 @@ mod tests {
             port: 5900,
             serial: "ABC123".into(),
             output: "Virtual-1".into(),
+            created_reverse: true,
         }
     }
 
@@ -152,6 +158,7 @@ mod tests {
                 "adb devices",
                 "niri msg output Virtual-1 on",
                 "niri msg --json outputs",
+                "adb -s ABC123 reverse --list",
                 "adb -s ABC123 reverse tcp:5900 tcp:5900",
                 "spawn wayvnc -r --max-fps=90 -o Virtual-1 127.0.0.1 5900",
                 NOTIFY_ON,
@@ -296,6 +303,42 @@ mod tests {
             calls.last().unwrap(),
             "adb -s ABC123 reverse --remove tcp:5900"
         );
+    }
+
+    #[test]
+    fn rollback_keeps_a_reverse_that_already_existed() {
+        let (_dir, paths) = temp_paths();
+        let fake = FakeSystem::new();
+        fake.respond("niri msg --json outputs", ok(ON));
+        fake.respond("adb devices", ok(ADB_ONE));
+        fake.respond(
+            "adb -s ABC123 reverse --list",
+            ok("UsbFfs tcp:5900 tcp:5900\n"),
+        );
+        fake.set_spawn_dies(true);
+        let niri = Niri::new(&fake);
+
+        run(&ctx(&fake, &niri, &paths)).unwrap_err();
+        let calls = fake.calls();
+        assert!(
+            !calls.iter().any(|c| c.contains("reverse --remove")),
+            "{calls:?}"
+        );
+    }
+
+    #[test]
+    fn existing_reverse_is_recorded_as_not_ours() {
+        let (_dir, paths) = temp_paths();
+        let fake = FakeSystem::new();
+        script_off_then_on(&fake);
+        fake.respond(
+            "adb -s ABC123 reverse --list",
+            ok("UsbFfs tcp:5900 tcp:5900\n"),
+        );
+        let niri = Niri::new(&fake);
+
+        run(&ctx(&fake, &niri, &paths)).unwrap();
+        assert!(!state::load(&paths).unwrap().unwrap().created_reverse);
     }
 
     #[test]
