@@ -3,6 +3,7 @@ pub mod commands;
 pub mod compositor;
 pub mod config;
 pub mod error;
+pub mod lock;
 pub mod notify;
 pub mod state;
 pub mod system;

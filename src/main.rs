@@ -5,6 +5,8 @@ use clap::{Parser, Subcommand};
 use tabmon::commands::{self, Ctx};
 use tabmon::compositor::niri::Niri;
 use tabmon::config::{Config, Paths};
+use tabmon::error::render;
+use tabmon::lock;
 use tabmon::notify;
 use tabmon::system::RealSystem;
 
@@ -56,6 +58,18 @@ fn main() -> ExitCode {
 }
 
 fn run(command: Cmd, sys: &RealSystem, config: Config, paths: Paths) -> anyhow::Result<ExitCode> {
+    // Commands that change the session run one at a time; a second keypress is dropped,
+    // without a notification, because the first one already shows its own.
+    let _lock = match command {
+        Cmd::On | Cmd::Off | Cmd::Toggle => match lock::try_acquire(&paths)? {
+            Some(lock) => Some(lock),
+            None => {
+                eprintln!("{}", render(&lock::busy().into()));
+                return Ok(ExitCode::FAILURE);
+            }
+        },
+        Cmd::Status | Cmd::Doctor => None,
+    };
     let niri = Niri::new(sys);
     let ctx = Ctx {
         sys,
