@@ -79,7 +79,9 @@ Run `tabmon doctor`. Each failed check says how to fix it. If wayvnc fails to st
 
 ## Security
 
-wayvnc only listens on `127.0.0.1` and is reached through `adb reverse` over USB. It is never exposed to your network, so it needs no password.
+wayvnc only listens on `127.0.0.1` and the tablet reaches it through `adb reverse` over USB, so it is never exposed to your network.
+
+It has no password, though: while it is on, **any local process or user on this machine** can connect to `127.0.0.1:5900` and control that screen, including sandboxed apps that share the host network. Turn it off (`tabmon off`) when you are not using it.
 
 ## Limitations
 

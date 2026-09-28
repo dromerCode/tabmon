@@ -15,6 +15,7 @@ The automated tests cannot run niri, vkms or a tablet. Before each release, run 
 - [ ] With the tablet unplugged, `tabmon on` fails with "no adb device found" and a notification, and the output stays off.
 - [ ] With the session on, unplug the tablet and run `tabmon off`: it still turns the output off.
 - [ ] With another program on port 5900 (`nc -l 127.0.0.1 5900`), `tabmon on` fails pointing to `wayvnc.log`, and the output is back off.
+- [ ] With another tool already serving the tablet on port 5900 (its own wayvnc and `adb reverse tcp:5900 tcp:5900`), `tabmon on` fails, and that session keeps working: the output stays on and `adb reverse --list` still shows `tcp:5900`.
 - [ ] Kill wayvnc by hand (`kill <pid>`), then `tabmon status` reports a stale session and `tabmon off` cleans it up.
 
 ## Release

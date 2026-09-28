@@ -19,7 +19,7 @@ CLI en Rust para usar una tablet Android como **segunda pantalla extendida** en 
 3. `tabmon on` enciende la salida en niri, hace `adb reverse tcp:5900 tcp:5900` y lanza **wayvnc** en `127.0.0.1` solo sobre esa salida.
 4. En la tablet, un cliente VNC conecta a `localhost:5900`, que por el `adb reverse` llega al PC por USB.
 
-wayvnc **nunca** escucha fuera de localhost: no hay contraseña porque no hace falta, solo se llega por USB.
+wayvnc **nunca** escucha fuera de localhost, así que no queda expuesto a la red. No tiene contraseña: mientras está encendido, cualquier proceso o usuario local puede conectarse a `127.0.0.1:<port>`; el README lo avisa. Una versión posterior puede usar un socket unix (`wayvnc -u` + `adb reverse ... localfilesystem:`) para limitarlo al usuario.
 
 ## 3. Comandos
 
@@ -70,7 +70,7 @@ Si cualquier paso falla, **deshace lo hecho hasta ese momento** en orden inverso
 
 1. Si no está activo → limpia el estado que quede, mensaje "already off", salida 0.
 2. Manda SIGTERM **solo al wayvnc que arrancó tabmon** (PID guardado, comprobando que sigue siendo wayvnc). Nunca `pkill`: no toca otros wayvnc.
-3. Quita **solo su** reverse: `adb reverse --remove tcp:<port>` (nunca `--remove-all`).
+3. Quita **solo su** reverse: `adb reverse --remove tcp:<port>` (nunca `--remove-all`), y solo si lo creó `on` (si ya existía antes, lo deja). `on` lo comprueba con `adb reverse --list` y lo guarda en el estado.
 4. Apaga la salida (`niri msg output <output> off`).
 5. Borra el estado y notifica.
 
