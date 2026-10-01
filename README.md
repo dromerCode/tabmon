@@ -12,13 +12,15 @@ niri cannot create virtual outputs the way Hyprland (`hyprctl output create head
 
 ## Install
 
-From the AUR:
+> **AUR package: work in progress.** We're still working on it, so `paru -S tabmon` won't work yet. For now, build it from source.
+
+From the AUR (coming soon):
 
 ```sh
 paru -S tabmon
 ```
 
-Or from source (needs `niri`, `wayvnc` and `android-tools` installed):
+From source (needs `niri`, `wayvnc` and `android-tools` installed):
 
 ```sh
 cargo build --release
@@ -27,7 +29,7 @@ install -Dm755 target/release/tabmon ~/.local/bin/tabmon
 
 ## Setup
 
-1. **Load vkms.** The AUR package loads it at boot. Otherwise, run `sudo modprobe vkms` and add `vkms` to a file in `/etc/modules-load.d/` to make it permanent.
+1. **Load vkms.** The AUR package will load it at boot once it is published. Until then, run `sudo modprobe vkms` and add `vkms` to a file in `/etc/modules-load.d/` to make it permanent.
 2. **Configure the output in niri** (`~/.config/niri/config.kdl`). Adjust the mode to your tablet and the position to where it sits next to your screen:
 
    ```kdl
