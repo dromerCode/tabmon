@@ -208,6 +208,12 @@ mod tests {
         let pid = sys
             .spawn_detached("sleep", &["30"], &dir.path().join("log"))
             .unwrap();
+        // spawn() can return before the kernel renames the child in execve, so for a moment
+        // /proc still shows the parent thread's name. Wait for the rename instead of racing it.
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while sys.process_name(pid).as_deref() != Some("sleep") && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(5));
+        }
         assert_eq!(sys.process_name(pid).as_deref(), Some("sleep"));
 
         sys.terminate(pid).unwrap();
