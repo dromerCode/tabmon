@@ -1,10 +1,10 @@
-# Maintainer: pichaDev <daniplay1011@gmail.com>
+# Maintainer: dromerCode <dromerCode@gmail.com>
 pkgname=tabmon
 pkgver=0.1.0
 pkgrel=1
 pkgdesc="Use an Android tablet as an extended monitor on niri (vkms + wayvnc + adb)"
 arch=('x86_64' 'aarch64')
-url="https://github.com/pichaDev/tabmon"
+url="https://github.com/dromerCode/tabmon"
 license=('MIT')
 depends=('niri' 'wayvnc' 'android-tools' 'gcc-libs' 'glibc')
 optdepends=('libnotify: desktop notifications')
