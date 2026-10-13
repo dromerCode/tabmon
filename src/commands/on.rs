@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 
 use super::{Ctx, active_state};
 use crate::adb;
-use crate::compositor::{OutputState, missing_output};
+use crate::compositor::OutputState;
 use crate::error::{UserError, with_rollback_failures};
 use crate::notify;
 use crate::state::{self, State};
@@ -27,7 +27,7 @@ pub fn run(ctx: &Ctx) -> Result<String> {
     let cfg = &ctx.config;
     let before = ctx.compositor.output_state(&cfg.output)?;
     if before == OutputState::Missing {
-        return Err(missing_output(&cfg.output).into());
+        return Err(ctx.compositor.missing_output(&cfg.output).into());
     }
     let serial = adb::select_device(&adb::devices(ctx.sys)?, cfg.adb_serial.as_deref())?;
 
@@ -454,5 +454,40 @@ mod tests {
 
         run(&ctx).unwrap();
         assert!(!fake.calls().iter().any(|c| c.starts_with("notify-send")));
+    }
+
+    #[test]
+    fn hyprland_creates_the_output_and_removes_it_on_failure() {
+        use crate::compositor::hyprland::Hyprland;
+        const OFF: &str = include_str!("../../tests/fixtures/hyprland-monitors-off.json");
+        const ON: &str = include_str!("../../tests/fixtures/hyprland-monitors-on.json");
+
+        let (_dir, paths) = temp_paths();
+        let fake = FakeSystem::new();
+        fake.respond("hyprctl -j monitors", ok(OFF));
+        fake.respond("hyprctl -j monitors", ok(ON));
+        fake.respond("adb devices", ok(ADB_ONE));
+        fake.respond("hyprctl output create headless TABMON", ok("ok"));
+        fake.respond("hyprctl output remove TABMON", ok("ok"));
+        fake.set_spawn_dies(true);
+        let hypr = Hyprland::new(&fake);
+        let mut ctx = ctx(&fake, &hypr, &paths);
+        ctx.config.output = "TABMON".into();
+
+        run(&ctx).unwrap_err();
+        assert_eq!(
+            fake.calls(),
+            vec![
+                "hyprctl -j monitors",
+                "adb devices",
+                "hyprctl output create headless TABMON",
+                "hyprctl -j monitors",
+                "adb -s ABC123 reverse --list",
+                "adb -s ABC123 reverse tcp:5900 tcp:5900",
+                "spawn wayvnc -r --max-fps=90 -o TABMON 127.0.0.1 5900",
+                "adb -s ABC123 reverse --remove tcp:5900",
+                "hyprctl output remove TABMON",
+            ]
+        );
     }
 }

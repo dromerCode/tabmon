@@ -11,7 +11,7 @@ use crate::error::UserError;
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
-    /// vkms output defined in niri's config.kdl.
+    /// Output to share; by default the compositor's (`Kind::default_output`).
     pub output: String,
     pub port: u16,
     pub max_fps: u32,
@@ -35,21 +35,27 @@ impl Default for Config {
 
 impl Config {
     /// Reads the config file; a missing file means all defaults.
-    pub fn load(path: &Path) -> Result<Config> {
+    pub fn load(path: &Path, default_output: &str) -> Result<Config> {
         let text = match std::fs::read_to_string(path) {
             Ok(text) => text,
-            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Config::default()),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => String::new(),
             Err(e) => {
                 return Err(
                     anyhow::Error::new(e).context(format!("could not read {}", path.display()))
                 );
             }
         };
-        toml::from_str(&text).map_err(|e| {
+        let invalid = |e: toml::de::Error| -> anyhow::Error {
             UserError::new(format!("invalid config file {}: {e}", path.display()))
                 .hint("see the configuration section of the README")
                 .into()
-        })
+        };
+        let mut config: Config = toml::from_str(&text).map_err(invalid)?;
+        let table: toml::Table = toml::from_str(&text).map_err(invalid)?;
+        if !table.contains_key("output") {
+            config.output = default_output.into();
+        }
+        Ok(config)
     }
 }
 
@@ -118,11 +124,11 @@ mod tests {
     #[test]
     fn missing_file_gives_defaults() {
         let (_dir, paths) = temp_paths();
-        let config = Config::load(&paths.config_file).unwrap();
+        let config = Config::load(&paths.config_file, "TABMON").unwrap();
         assert_eq!(
             config,
             Config {
-                output: "Virtual-1".into(),
+                output: "TABMON".into(),
                 port: 5900,
                 max_fps: 90,
                 notify: true,
@@ -134,17 +140,24 @@ mod tests {
     #[test]
     fn partial_file_is_completed_with_defaults() {
         let (_dir, paths) = write_config("port = 5901\nadb_serial = \"ABC123\"\n");
-        let config = Config::load(&paths.config_file).unwrap();
+        let config = Config::load(&paths.config_file, "TABMON").unwrap();
         assert_eq!(config.port, 5901);
         assert_eq!(config.adb_serial.as_deref(), Some("ABC123"));
-        assert_eq!(config.output, "Virtual-1");
+        assert_eq!(config.output, "TABMON");
         assert!(config.notify);
+    }
+
+    #[test]
+    fn configured_output_wins_over_the_default() {
+        let (_dir, paths) = write_config("output = \"HDMI-A-1\"\n");
+        let config = Config::load(&paths.config_file, "TABMON").unwrap();
+        assert_eq!(config.output, "HDMI-A-1");
     }
 
     #[test]
     fn invalid_toml_is_a_clear_error() {
         let (_dir, paths) = write_config("port = = 3");
-        let text = render(&Config::load(&paths.config_file).unwrap_err());
+        let text = render(&Config::load(&paths.config_file, "Virtual-1").unwrap_err());
         assert!(text.starts_with("error: invalid config file"), "{text}");
         assert!(text.contains("config.toml"), "{text}");
     }
@@ -152,7 +165,7 @@ mod tests {
     #[test]
     fn unknown_key_is_rejected() {
         let (_dir, paths) = write_config("max-fps = 60\n");
-        let text = render(&Config::load(&paths.config_file).unwrap_err());
+        let text = render(&Config::load(&paths.config_file, "Virtual-1").unwrap_err());
         assert!(text.contains("unknown field"), "{text}");
         assert!(text.contains("max-fps"), "{text}");
     }
