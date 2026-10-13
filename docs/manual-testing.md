@@ -27,3 +27,14 @@ The automated tests cannot run niri, vkms or a tablet. Before each release, run 
 3. Commit, tag `vX.Y.Z` and push the tag.
 4. In `packaging/aur/`, run `updpkgsums`, then `makepkg -si` to check the package builds and installs.
 5. Copy `PKGBUILD` to the AUR repository, run `makepkg --printsrcinfo > .SRCINFO`, commit and push.
+
+## Hyprland
+
+With `monitor = TABMON, ...` in `hyprland.conf` and the tablet connected:
+
+- [ ] `tabmon doctor` shows `hyprctl installed` and `Hyprland is reachable`, and no vkms checks.
+- [ ] `tabmon on` creates `TABMON` (`hyprctl monitors` lists it with the mode, position and scale from the config) and the tablet's VNC client shows it.
+- [ ] Windows and workspaces can be moved to `TABMON`, and touch on the tablet works.
+- [ ] `tabmon off` removes `TABMON` (`hyprctl monitors` no longer lists it) and the windows go back to the other screen.
+- [ ] The keybinding (`tabmon toggle`) turns it on and off, with a notification each time.
+- [ ] With the tablet unplugged, `tabmon on` fails with "no adb device found" and `TABMON` is not created.
