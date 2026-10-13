@@ -10,7 +10,7 @@ depends=('niri' 'wayvnc' 'android-tools' 'gcc-libs' 'glibc')
 optdepends=('libnotify: desktop notifications')
 makedepends=('cargo')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('57c8ebe98803241bcbf81920b51b9611e5e8849028e2f1d71b80f7b4d89849e0')
 
 prepare() {
   cd "$pkgname-$pkgver"
