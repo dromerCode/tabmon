@@ -1,13 +1,15 @@
 # tabmon
 
-Use an Android tablet as an **extended** second monitor on [niri](https://github.com/YaLTeR/niri), over USB.
+Use an Android tablet as an **extended** second monitor on [niri](https://github.com/YaLTeR/niri) or [Hyprland](https://hyprland.org), over USB.
 
-niri cannot create virtual outputs the way Hyprland (`hyprctl output create headless`) or Sway (`swaymsg create_output`) can. tabmon works around it with the kernel's `vkms` module, which adds a fake display that niri treats like a real one, and streams it to the tablet with wayvnc.
+tabmon detects which compositor you are running, creates a virtual output there and streams it to the tablet with wayvnc.
 
 ## How it works
 
-1. `vkms` creates a virtual output (`Virtual-1`) that niri configures like any monitor.
-2. `tabmon on` turns it on, runs `adb reverse tcp:5900 tcp:5900` and starts wayvnc on `127.0.0.1` for that output only.
+1. A virtual output appears:
+   - **niri** cannot create virtual outputs, so tabmon uses the kernel's `vkms` module, which adds a fake display (`Virtual-1`) that niri configures like any monitor. `tabmon on` turns it on.
+   - **Hyprland** creates them itself: `tabmon on` runs `hyprctl output create headless TABMON`, and `tabmon off` removes it.
+2. `tabmon on` runs `adb reverse tcp:5900 tcp:5900` and starts wayvnc on `127.0.0.1` for that output only.
 3. A VNC client on the tablet connects to `localhost:5900`, which reaches the PC through the USB cable.
 
 ## Install
@@ -20,7 +22,7 @@ From the AUR (coming soon):
 paru -S tabmon
 ```
 
-From source (needs `niri`, `wayvnc` and `android-tools` installed):
+From source (needs `wayvnc` and `android-tools` installed, plus niri or Hyprland):
 
 ```sh
 cargo build --release
@@ -29,8 +31,16 @@ install -Dm755 target/release/tabmon ~/.local/bin/tabmon
 
 ## Setup
 
-1. **Load vkms.** The AUR package will load it at boot once it is published. Until then, run `sudo modprobe vkms` and add `vkms` to a file in `/etc/modules-load.d/` to make it permanent.
-2. **Configure the output in niri** (`~/.config/niri/config.kdl`). Adjust the mode to your tablet and the position to where it sits next to your screen:
+### niri
+
+1. **Load vkms**, now and at every boot:
+
+   ```sh
+   sudo modprobe vkms
+   sudo cp /usr/share/tabmon/tabmon-vkms.conf /etc/modules-load.d/   # from source: packaging/modules-load.d/tabmon-vkms.conf
+   ```
+
+2. **Configure the output** in `~/.config/niri/config.kdl`. Adjust the mode to your tablet and the position to where it sits next to your screen:
 
    ```kdl
    output "Virtual-1" {
@@ -41,15 +51,34 @@ install -Dm755 target/release/tabmon ~/.local/bin/tabmon
    }
    ```
 
-3. **On the tablet:** enable USB debugging, connect the cable and accept the prompt. Install a VNC client (for example [AVNC](https://github.com/gujjwal00/avnc)) and add a server at `localhost`, port `5900`.
-4. **Check everything:** `tabmon doctor`.
-5. **Add a keybinding** in niri:
+3. **Add a keybinding:**
 
    ```kdl
    binds {
        Mod+Shift+T hotkey-overlay-title="Toggle Tablet Monitor" { spawn "tabmon" "toggle"; }
    }
    ```
+
+### Hyprland
+
+No kernel module needed.
+
+1. **Configure the output** in `~/.config/hypr/hyprland.conf`. Hyprland applies it whenever tabmon creates the output. Adjust the mode to your tablet and the position to where it sits next to your screen:
+
+   ```ini
+   monitor = TABMON, 2560x1600@60, -1707x0, 1.5
+   ```
+
+2. **Add a keybinding:**
+
+   ```ini
+   bind = SUPER SHIFT, T, exec, tabmon toggle
+   ```
+
+### Both
+
+1. **On the tablet:** enable USB debugging, connect the cable and accept the prompt. Install a VNC client (for example [AVNC](https://github.com/gujjwal00/avnc)) and add a server at `localhost`, port `5900`.
+2. **Check everything:** `tabmon doctor`.
 
 ## Usage
 
@@ -68,7 +97,7 @@ Add `-v` to see every command tabmon runs.
 Optional. `~/.config/tabmon/config.toml` (these are the defaults):
 
 ```toml
-output  = "Virtual-1"   # vkms output defined in niri's config.kdl
+output  = "Virtual-1"   # niri: vkms output from config.kdl; Hyprland default: "TABMON"
 port    = 5900
 max_fps = 90
 notify  = true          # desktop notifications on on/off and on errors
@@ -87,7 +116,7 @@ It has no password, though: while it is on, **any local process or user on this 
 
 ## Limitations
 
-- Only niri for now (Hyprland and Sway can create headless outputs on their own).
+- Only niri and Hyprland for now.
 - Only USB; Wi-Fi would need authentication and is not supported yet.
 
 ## License

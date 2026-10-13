@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
-use super::{Compositor, OutputState};
+use super::{Compositor, Kind, OutputState};
 use crate::error::UserError;
 use crate::system::System;
 
@@ -34,6 +34,10 @@ pub fn parse_outputs(json: &str) -> Result<HashMap<String, bool>> {
 }
 
 impl Compositor for Niri<'_> {
+    fn kind(&self) -> Kind {
+        Kind::Niri
+    }
+
     fn output_state(&self, output: &str) -> Result<OutputState> {
         let out = self.sys.run("niri", &["msg", "--json", "outputs"])?;
         if !out.success {
@@ -61,6 +65,12 @@ impl Compositor for Niri<'_> {
             .into());
         }
         Ok(())
+    }
+
+    fn missing_output(&self, output: &str) -> UserError {
+        UserError::new(format!("output {output} not found in niri")).hint(format!(
+            "load the vkms module (sudo modprobe vkms) and add an `output \"{output}\"` block to niri's config.kdl; see the README"
+        ))
     }
 }
 

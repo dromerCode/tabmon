@@ -1,6 +1,6 @@
 use super::Ctx;
 use crate::adb;
-use crate::compositor::{OutputState, missing_output};
+use crate::compositor::{Kind, OutputState};
 use crate::error::UserError;
 
 pub struct Check {
@@ -33,35 +33,48 @@ impl Report {
 pub fn run(ctx: &Ctx) -> Report {
     let mut checks = Vec::new();
 
-    for (program, args) in [
-        ("niri", ["--version"]),
-        ("wayvnc", ["--version"]),
-        ("adb", ["version"]),
-    ] {
-        let problem = ctx.sys.run(program, &args).err().map(|e| describe(&e));
+    let kind = ctx.compositor.kind();
+    let compositor_cli = match kind {
+        Kind::Niri => ("niri", "--version"),
+        Kind::Hyprland => ("hyprctl", "version"),
+    };
+    for (program, arg) in [compositor_cli, ("wayvnc", "--version"), ("adb", "version")] {
+        let problem = ctx.sys.run(program, &[arg]).err().map(|e| describe(&e));
         checks.push(Check {
             label: format!("{program} installed"),
             problem,
         });
     }
 
-    checks.push(Check {
-        label: "vkms module loaded".into(),
-        problem: (!ctx.sys.module_loaded("vkms")).then(|| {
-            "sudo modprobe vkms (the AUR package loads it at boot via /usr/lib/modules-load.d/tabmon-vkms.conf)".into()
-        }),
-    });
-
     let output = &ctx.config.output;
-    let problem = match ctx.compositor.output_state(output) {
-        Ok(OutputState::Missing) => Some(describe(&missing_output(output).into())),
-        Ok(_) => None,
-        Err(e) => Some(describe(&e)),
-    };
-    checks.push(Check {
-        label: format!("output {output} exists in niri"),
-        problem,
-    });
+    let output_state = ctx.compositor.output_state(output);
+    match kind {
+        // niri needs vkms for the output to exist at all.
+        Kind::Niri => {
+            checks.push(Check {
+                label: "vkms module loaded".into(),
+                problem: (!ctx.sys.module_loaded("vkms")).then(|| {
+                    "sudo modprobe vkms; to load it at boot, copy tabmon-vkms.conf to /etc/modules-load.d/ (see the README)".into()
+                }),
+            });
+            let problem = match output_state {
+                Ok(OutputState::Missing) => {
+                    Some(describe(&ctx.compositor.missing_output(output).into()))
+                }
+                Ok(_) => None,
+                Err(e) => Some(describe(&e)),
+            };
+            checks.push(Check {
+                label: format!("output {output} exists in niri"),
+                problem,
+            });
+        }
+        // Hyprland creates the output on `on`; it only has to answer.
+        Kind::Hyprland => checks.push(Check {
+            label: "Hyprland is reachable".into(),
+            problem: output_state.err().map(|e| describe(&e)),
+        }),
+    }
 
     let device = adb::devices(ctx.sys).and_then(|devices| {
         Ok(adb::select_device(
@@ -102,9 +115,12 @@ fn describe(err: &anyhow::Error) -> String {
 mod tests {
     use super::*;
     use crate::commands::tests_support::{ADB_ONE, MISSING, ON, ctx};
+    use crate::compositor::hyprland::Hyprland;
     use crate::compositor::niri::Niri;
     use crate::error::UserError;
-    use crate::testing::{FakeSystem, ok, temp_paths};
+    use crate::testing::{FakeSystem, fail, ok, temp_paths};
+
+    const HYPR_MONITORS: &str = include_str!("../../tests/fixtures/hyprland-monitors-off.json");
 
     fn healthy(fake: &FakeSystem) {
         fake.load_module("vkms");
@@ -159,7 +175,7 @@ mod tests {
 
         let text = run(&ctx(&fake, &niri, &paths)).render();
         assert!(
-            text.contains("✗ vkms module loaded\n  sudo modprobe vkms"),
+            text.contains("✗ vkms module loaded\n  sudo modprobe vkms; to load it at boot, copy tabmon-vkms.conf to /etc/modules-load.d/ (see the README)"),
             "{text}"
         );
         assert!(text.contains("✗ output Virtual-1 exists in niri\n  output Virtual-1 not found in niri: load the vkms module"), "{text}");
@@ -180,6 +196,40 @@ mod tests {
         let text = run(&ctx(&fake, &niri, &paths)).render();
         assert!(
             text.ends_with("✗ adb device ready\n  adb device XYZ is unauthorized: accept the USB debugging prompt on the tablet"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn hyprland_skips_the_vkms_checks() {
+        let (_dir, paths) = temp_paths();
+        let fake = FakeSystem::new();
+        fake.respond("hyprctl -j monitors", ok(HYPR_MONITORS));
+        fake.respond("adb devices", ok(ADB_ONE));
+        let hypr = Hyprland::new(&fake);
+
+        let report = run(&ctx(&fake, &hypr, &paths));
+        assert!(report.ok(), "{}", report.render());
+        assert_eq!(
+            report.render(),
+            "✓ hyprctl installed\n✓ wayvnc installed\n✓ adb installed\n✓ Hyprland is reachable\n✓ adb device ready (ABC123)"
+        );
+    }
+
+    #[test]
+    fn unreachable_hyprland_is_explained() {
+        let (_dir, paths) = temp_paths();
+        let fake = FakeSystem::new();
+        fake.respond(
+            "hyprctl -j monitors",
+            fail("couldn't connect to the socket\n"),
+        );
+        fake.respond("adb devices", ok(ADB_ONE));
+        let hypr = Hyprland::new(&fake);
+
+        let text = run(&ctx(&fake, &hypr, &paths)).render();
+        assert!(
+            text.contains("✗ Hyprland is reachable\n  could not talk to Hyprland: couldn't connect to the socket: tabmon needs a running Hyprland session"),
             "{text}"
         );
     }

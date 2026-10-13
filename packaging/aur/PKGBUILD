@@ -1,16 +1,18 @@
 # Maintainer: dromerCode <dromerCode@gmail.com>
 pkgname=tabmon
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=1
-pkgdesc="Use an Android tablet as an extended monitor on niri (vkms + wayvnc + adb)"
+pkgdesc="Use an Android tablet as an extended monitor on niri or Hyprland (vkms + wayvnc + adb)"
 arch=('x86_64' 'aarch64')
 url="https://github.com/dromerCode/tabmon"
 license=('MIT')
-depends=('niri' 'wayvnc' 'android-tools' 'gcc-libs' 'glibc')
-optdepends=('libnotify: desktop notifications')
+depends=('wayvnc' 'android-tools' 'gcc-libs' 'glibc')
+optdepends=('niri: supported compositor (with the vkms module)'
+            'hyprland: supported compositor'
+            'libnotify: desktop notifications')
 makedepends=('cargo')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('57c8ebe98803241bcbf81920b51b9611e5e8849028e2f1d71b80f7b4d89849e0')
+sha256sums=('SKIP')  # set when v0.2.0 is tagged
 
 prepare() {
   cd "$pkgname-$pkgver"
@@ -34,7 +36,7 @@ check() {
 package() {
   cd "$pkgname-$pkgver"
   install -Dm755 target/release/tabmon "$pkgdir/usr/bin/tabmon"
-  install -Dm644 packaging/modules-load.d/tabmon-vkms.conf "$pkgdir/usr/lib/modules-load.d/tabmon-vkms.conf"
+  install -Dm644 packaging/modules-load.d/tabmon-vkms.conf "$pkgdir/usr/share/tabmon/tabmon-vkms.conf"
   install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }

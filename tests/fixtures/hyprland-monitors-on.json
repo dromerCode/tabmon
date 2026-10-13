@@ -1,0 +1,83 @@
+[
+    {
+        "id": 0,
+        "name": "eDP-1",
+        "description": "Chimei Innolux Corporation 0x150C",
+        "make": "Chimei Innolux Corporation",
+        "model": "0x150C",
+        "serial": "",
+        "width": 1920,
+        "height": 1080,
+        "refreshRate": 144.003,
+        "x": 0,
+        "y": 0,
+        "activeWorkspace": {
+            "id": 1,
+            "name": "1"
+        },
+        "specialWorkspace": {
+            "id": 0,
+            "name": ""
+        },
+        "reserved": [
+            0,
+            30,
+            0,
+            0
+        ],
+        "scale": 1.0,
+        "transform": 0,
+        "focused": true,
+        "dpmsStatus": true,
+        "vrr": false,
+        "solitary": "0",
+        "activelyTearing": false,
+        "directScanoutTo": "0",
+        "disabled": false,
+        "currentFormat": "XRGB8888",
+        "mirrorOf": "none",
+        "availableModes": [
+            "1920x1080@144.00Hz",
+            "1920x1080@60.00Hz"
+        ]
+    },
+    {
+        "id": 1,
+        "name": "TABMON",
+        "description": "",
+        "make": "headless",
+        "model": "headless",
+        "serial": "",
+        "width": 2560,
+        "height": 1600,
+        "refreshRate": 60.0,
+        "x": -1707,
+        "y": 0,
+        "activeWorkspace": {
+            "id": 2,
+            "name": "2"
+        },
+        "specialWorkspace": {
+            "id": 0,
+            "name": ""
+        },
+        "reserved": [
+            0,
+            0,
+            0,
+            0
+        ],
+        "scale": 1.5,
+        "transform": 0,
+        "focused": false,
+        "dpmsStatus": true,
+        "vrr": false,
+        "solitary": "0",
+        "activelyTearing": false,
+        "directScanoutTo": "0",
+        "disabled": false,
+        "currentFormat": "XRGB8888",
+        "mirrorOf": "none",
+        "availableModes": []
+    }
+]

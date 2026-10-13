@@ -110,6 +110,7 @@ pub fn parse_stat(stat: &str) -> Option<String> {
 pub fn package_for(program: &str) -> Option<&'static str> {
     match program {
         "niri" => Some("niri"),
+        "hyprctl" => Some("hyprland"),
         "wayvnc" => Some("wayvnc"),
         "adb" => Some("android-tools"),
         "notify-send" => Some("libnotify"),
@@ -160,6 +161,15 @@ mod tests {
     fn parse_stat_rejects_garbage() {
         assert_eq!(parse_stat(""), None);
         assert_eq!(parse_stat("no parentheses here"), None);
+    }
+
+    #[test]
+    fn missing_hyprctl_points_to_the_hyprland_package() {
+        let err = spawn_error("hyprctl", io::Error::from(io::ErrorKind::NotFound));
+        assert_eq!(
+            render(&err),
+            "error: hyprctl not found\nhint: pacman -S hyprland"
+        );
     }
 
     #[test]

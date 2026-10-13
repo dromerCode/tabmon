@@ -3,14 +3,16 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand};
 
 use tabmon::commands::{self, Ctx};
+use tabmon::compositor::hyprland::Hyprland;
 use tabmon::compositor::niri::Niri;
+use tabmon::compositor::{Compositor, Kind};
 use tabmon::config::{Config, Paths};
 use tabmon::error::render;
 use tabmon::lock;
 use tabmon::notify;
 use tabmon::system::RealSystem;
 
-/// Use an Android tablet as an extended monitor on niri.
+/// Use an Android tablet as an extended monitor on niri or Hyprland.
 #[derive(Parser)]
 #[command(version, about)]
 struct Cli {
@@ -41,14 +43,18 @@ fn main() -> ExitCode {
     let sys = RealSystem {
         verbose: cli.verbose,
     };
-    let setup = Paths::from_env().and_then(|paths| Ok((Config::load(&paths.config_file)?, paths)));
+    let setup = Kind::from_env().and_then(|kind| {
+        let paths = Paths::from_env()?;
+        let config = Config::load(&paths.config_file, kind.default_output())?;
+        Ok((kind, config, paths))
+    });
     // Without a readable config, notify anyway: that is the default.
     let notify_errors = match &setup {
-        Ok((config, _)) => config.notify,
+        Ok((_, config, _)) => config.notify,
         Err(_) => true,
     };
 
-    match setup.and_then(|(config, paths)| run(cli.command, &sys, config, paths)) {
+    match setup.and_then(|(kind, config, paths)| run(cli.command, &sys, kind, config, paths)) {
         Ok(code) => code,
         Err(err) => {
             eprintln!("{}", notify::failure(&sys, &err, notify_errors));
@@ -57,7 +63,13 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(command: Cmd, sys: &RealSystem, config: Config, paths: Paths) -> anyhow::Result<ExitCode> {
+fn run(
+    command: Cmd,
+    sys: &RealSystem,
+    kind: Kind,
+    config: Config,
+    paths: Paths,
+) -> anyhow::Result<ExitCode> {
     // Commands that change the session run one at a time; a second keypress is dropped,
     // without a notification, because the first one already shows its own.
     let _lock = match command {
@@ -70,10 +82,13 @@ fn run(command: Cmd, sys: &RealSystem, config: Config, paths: Paths) -> anyhow::
         },
         Cmd::Status | Cmd::Doctor => None,
     };
-    let niri = Niri::new(sys);
+    let compositor: Box<dyn Compositor> = match kind {
+        Kind::Niri => Box::new(Niri::new(sys)),
+        Kind::Hyprland => Box::new(Hyprland::new(sys)),
+    };
     let ctx = Ctx {
         sys,
-        compositor: &niri,
+        compositor: compositor.as_ref(),
         config,
         paths,
     };
