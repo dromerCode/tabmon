@@ -14,7 +14,8 @@ The automated tests cannot run niri, vkms or a tablet. Before each release, run 
 - [ ] The keybinding (`tabmon toggle`) turns it on and off, with a notification each time.
 - [ ] With the tablet unplugged, `tabmon on` fails with "no adb device found" and a notification, and the output stays off.
 - [ ] With the session on, unplug the tablet and run `tabmon off`: it still turns the output off.
-- [ ] With another program on port 5900 (`nc -l 127.0.0.1 5900`), `tabmon on` fails pointing to `wayvnc.log`, and the output is back off.
+- [ ] With the session on, unplug the tablet: `tabmon status` shows the device as "(not connected)" and `tabmon on` fails with "device ... is not connected" and a notification. Plug it back in: `tabmon on` says "reconnected" and the VNC client works again.
+- [ ] With another program on port 5900 (`python -c 'import socket,time; s=socket.socket(); s.bind(("127.0.0.1",5900)); s.listen(); time.sleep(30)'`), `tabmon on` fails pointing to `wayvnc.log`, and the output is back off.
 - [ ] With another tool already serving the tablet on port 5900 (its own wayvnc and `adb reverse tcp:5900 tcp:5900`), `tabmon on` fails, and that session keeps working: the output stays on and `adb reverse --list` still shows `tcp:5900`.
 - [ ] Pressing the keybinding twice quickly does not undo the first press: the second one is dropped (running `tabmon toggle` while `flock $XDG_RUNTIME_DIR/tabmon/lock sleep 5` holds the lock prints "another tabmon command is still running").
 - [ ] Kill wayvnc by hand (`kill <pid>`), then `tabmon status` reports a stale session and `tabmon off` cleans it up.

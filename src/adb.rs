@@ -64,6 +64,13 @@ pub fn select_device(devices: &[Device], wanted: Option<&str>) -> Result<String,
     }
 }
 
+/// Whether `serial` is connected and ready.
+pub fn is_ready(devices: &[Device], serial: &str) -> bool {
+    devices
+        .iter()
+        .any(|d| d.serial == serial && d.state == "device")
+}
+
 fn not_ready(d: &Device) -> UserError {
     match d.state.as_str() {
         "unauthorized" => UserError::new(format!("adb device {} is unauthorized", d.serial))

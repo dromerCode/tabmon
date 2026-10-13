@@ -1,15 +1,21 @@
 use anyhow::Result;
 
 use super::Ctx;
+use crate::adb;
 use crate::state;
 use crate::vnc;
 
 pub fn run(ctx: &Ctx) -> Result<String> {
     Ok(match state::load(&ctx.paths)? {
-        Some(s) if vnc::is_running(ctx.sys, s.pid) => format!(
-            "on\n  output: {}\n  port: {} (localhost only)\n  device: {}\n  wayvnc pid: {}",
-            s.output, s.port, s.serial, s.pid
-        ),
+        Some(s) if vnc::is_running(ctx.sys, s.pid) => {
+            // If adb itself fails, say nothing rather than guess.
+            let unplugged = adb::devices(ctx.sys).is_ok_and(|d| !adb::is_ready(&d, &s.serial));
+            let note = if unplugged { " (not connected)" } else { "" };
+            format!(
+                "on\n  output: {}\n  port: {} (localhost only)\n  device: {}{note}\n  wayvnc pid: {}",
+                s.output, s.port, s.serial, s.pid
+            )
+        }
         Some(_) => "off (stale session left behind; `tabmon off` cleans it up)".into(),
         None => "off".into(),
     })
@@ -18,10 +24,10 @@ pub fn run(ctx: &Ctx) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::tests_support::ctx;
+    use crate::commands::tests_support::{ADB_ONE, ctx};
     use crate::compositor::niri::Niri;
     use crate::state::State;
-    use crate::testing::{FakeSystem, temp_paths};
+    use crate::testing::{FakeSystem, ok, temp_paths};
 
     fn saved() -> State {
         State {
@@ -47,10 +53,25 @@ mod tests {
         let fake = FakeSystem::new();
         state::save(&paths, &saved()).unwrap();
         fake.add_process(77, "wayvnc");
+        fake.respond("adb devices", ok(ADB_ONE));
         let niri = Niri::new(&fake);
         assert_eq!(
             run(&ctx(&fake, &niri, &paths)).unwrap(),
             "on\n  output: Virtual-1\n  port: 5900 (localhost only)\n  device: ABC123\n  wayvnc pid: 77"
+        );
+    }
+
+    #[test]
+    fn reports_an_unplugged_device() {
+        let (_dir, paths) = temp_paths();
+        let fake = FakeSystem::new();
+        state::save(&paths, &saved()).unwrap();
+        fake.add_process(77, "wayvnc");
+        fake.respond("adb devices", ok("List of devices attached\n\n"));
+        let niri = Niri::new(&fake);
+        assert_eq!(
+            run(&ctx(&fake, &niri, &paths)).unwrap(),
+            "on\n  output: Virtual-1\n  port: 5900 (localhost only)\n  device: ABC123 (not connected)\n  wayvnc pid: 77"
         );
     }
 

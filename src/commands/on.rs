@@ -21,8 +21,8 @@ enum Undo {
 }
 
 pub fn run(ctx: &Ctx) -> Result<String> {
-    if active_state(ctx)?.is_some() {
-        return Ok("already on".into());
+    if let Some(saved) = active_state(ctx)? {
+        return check_session(ctx, saved);
     }
     let cfg = &ctx.config;
     let before = ctx.compositor.output_state(&cfg.output)?;
@@ -48,6 +48,28 @@ pub fn run(ctx: &Ctx) -> Result<String> {
     Ok(format!(
         "tablet monitor on ({}, localhost:{}, device {serial})",
         cfg.output, cfg.port
+    ))
+}
+
+/// A session outlives the tablet, but unplugging it drops the `adb reverse`.
+fn check_session(ctx: &Ctx, mut saved: State) -> Result<String> {
+    if !adb::is_ready(&adb::devices(ctx.sys)?, &saved.serial) {
+        return Err(UserError::new(format!(
+            "tablet monitor is on, but adb device {} is not connected",
+            saved.serial
+        ))
+        .hint("plug the tablet back in and run `tabmon on` again, or run `tabmon off`")
+        .into());
+    }
+    if adb::has_reverse(ctx.sys, &saved.serial, saved.port)? {
+        return Ok("already on".into());
+    }
+    adb::reverse(ctx.sys, &saved.serial, saved.port)?;
+    saved.created_reverse = true;
+    state::save(&ctx.paths, &saved)?;
+    Ok(format!(
+        "already on (reconnected to device {})",
+        saved.serial
     ))
 }
 
@@ -167,16 +189,74 @@ mod tests {
         assert_eq!(state::load(&paths).unwrap(), Some(saved(SPAWN_PID)));
     }
 
+    /// A running session from a previous `on`.
+    fn session(fake: &FakeSystem, paths: &crate::config::Paths, created_reverse: bool) {
+        let state = State {
+            created_reverse,
+            ..saved(77)
+        };
+        state::save(paths, &state).unwrap();
+        fake.add_process(77, "wayvnc");
+    }
+
     #[test]
     fn already_on_does_nothing() {
         let (_dir, paths) = temp_paths();
         let fake = FakeSystem::new();
-        state::save(&paths, &saved(77)).unwrap();
-        fake.add_process(77, "wayvnc");
+        session(&fake, &paths, true);
+        fake.respond("adb devices", ok(ADB_ONE));
+        fake.respond(
+            "adb -s ABC123 reverse --list",
+            ok("UsbFfs tcp:5900 tcp:5900\n"),
+        );
         let niri = Niri::new(&fake);
 
         assert_eq!(run(&ctx(&fake, &niri, &paths)).unwrap(), "already on");
-        assert!(fake.calls().is_empty());
+        assert_eq!(
+            fake.calls(),
+            vec!["adb devices", "adb -s ABC123 reverse --list"]
+        );
+    }
+
+    #[test]
+    fn already_on_with_the_tablet_unplugged_is_an_error() {
+        let (_dir, paths) = temp_paths();
+        let fake = FakeSystem::new();
+        session(&fake, &paths, true);
+        fake.respond("adb devices", ok("List of devices attached\n\n"));
+        let niri = Niri::new(&fake);
+
+        let text = render(&run(&ctx(&fake, &niri, &paths)).unwrap_err());
+        assert_eq!(
+            text,
+            "error: tablet monitor is on, but adb device ABC123 is not connected\n\
+             hint: plug the tablet back in and run `tabmon on` again, or run `tabmon off`"
+        );
+        assert_eq!(fake.calls(), vec!["adb devices"]);
+    }
+
+    #[test]
+    fn already_on_restores_the_reverse_lost_when_unplugged() {
+        let (_dir, paths) = temp_paths();
+        let fake = FakeSystem::new();
+        session(&fake, &paths, false);
+        fake.respond("adb devices", ok(ADB_ONE));
+        let niri = Niri::new(&fake);
+
+        assert_eq!(
+            run(&ctx(&fake, &niri, &paths)).unwrap(),
+            "already on (reconnected to device ABC123)"
+        );
+        assert_eq!(
+            fake.calls(),
+            vec![
+                "adb devices",
+                "adb -s ABC123 reverse --list",
+                "adb -s ABC123 reverse tcp:5900 tcp:5900",
+            ]
+        );
+        // The new reverse is ours, so `off` removes it.
+        assert!(state::load(&paths).unwrap().unwrap().created_reverse);
     }
 
     #[test]
